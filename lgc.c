@@ -1412,9 +1412,6 @@ static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
 
 
 static GCObject* search_table(lua_State *L, Table *h, void *target) {
-  const char *weakkey, *weakvalue;
-  const TValue *mode = gfasttm(G(L), h->metatable, TM_MODE);
-  
   GCObject *result = search_GCObject(L, h->metatable, target);
   if(result) {
     h->metatable->path = h;
@@ -1430,19 +1427,19 @@ static GCObject* search_table(lua_State *L, Table *h, void *target) {
       GCObject *obj = gcvalue(tv);
       result = search_GCObject(L, obj, target);
       if(result) {
-        obj->path = h;
+        obj->path = (GCObject*)h;
         obj->path_desc = "array_value";
         return result;
       }
     }
   }
   for (n = gnode(h, 0); n < limit; n++) {  /* traverse hash part */
-    TValue *tv = gval(n);
+    const TValue *tv = gval(n);
     if(iscollectable(tv)) {
       GCObject *obj = gcvalue(tv);
       result = search_GCObject(L, obj, target);
       if(result) {
-        obj->path = h;
+        obj->path = (GCObject*)h;
         obj->path_desc = "map_value";
         return result;
       }
@@ -1453,7 +1450,7 @@ static GCObject* search_table(lua_State *L, Table *h, void *target) {
       GCObject *obj = gcvalue(tv);
       result = search_GCObject(L, obj, target);
       if(result) {
-        obj->path = h;
+        obj->path = (GCObject*) h;
         obj->path_desc = "map_key";
         return result;
       }
@@ -1467,12 +1464,18 @@ static void reset_flag(GCObject *o, void *user_data) {o->inspect_tmp_flag = 0; o
 static char temp_outbuf[4096];
 
 const char * lua_inspect_get_ref_path(lua_State *L, void *addr) {
+  GCObject* target;
   global_State *g = G(L);
   GCObject* o = g->allgc;
 
   walk_GCObject(o, reset_flag,NULL);
 
-  GCObject* target = search_GCObject(L, g->weak_global_table, addr);
+  target = search_GCObject(L, g->weak_global_table, addr);
+
+  if(!target) {
+    target = search_GCObject(L, gcvalue(&(g->l_registry)), addr);
+  }
+
   if(target) {
     FILE *fp = fmemopen(temp_outbuf, sizeof(temp_outbuf), "w");
 
@@ -1485,6 +1488,10 @@ const char * lua_inspect_get_ref_path(lua_State *L, void *addr) {
     fclose(fp);
     return temp_outbuf;
   }
+
+
+
+
 
   return NULL;
 }
