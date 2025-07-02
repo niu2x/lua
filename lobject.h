@@ -76,7 +76,7 @@ typedef struct GCObject GCObject;
 ** Common Header for all collectable objects (in macro form, to be
 ** included in other objects)
 */
-#define CommonHeader	GCObject *next; lu_byte tt; lu_byte marked; lu_byte inspect_flag; int16_t inspect_age
+#define CommonHeader	GCObject *next; lu_byte tt; lu_byte marked; lu_byte inspect_flag; int16_t inspect_age; const char *birth_place
 
 
 /*

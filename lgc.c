@@ -212,7 +212,21 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
   o->tt = tt;
   o->next = g->allgc;
   o->inspect_age = current_inspect_age;
+  o->birth_place = NULL;
   g->allgc = o;
+
+  if(L->ci) {
+    if(L->ci->func) {
+      if(ttisLclosure(L->ci->func)) {
+        Proto *proto = getproto(L->ci->func);
+        char *buffer = malloc(64);
+        snprintf(buffer, 64, "proto source %s:%d\n", getstr(proto->source), proto->lineinfo[L->ci->u.l.savedpc - proto->code]);
+        buffer[63] = 0;
+        o->birth_place = buffer;
+      }
+    }
+  }
+
   return o;
 }
 
@@ -696,6 +710,11 @@ static void freeLclosure (lua_State *L, LClosure *cl) {
 
 
 static void freeobj (lua_State *L, GCObject *o) {
+  if(o->birth_place) {
+    free(o->birth_place);
+    o->birth_place = NULL;
+  }
+
   switch (o->tt) {
     case LUA_TPROTO: luaF_freeproto(L, gco2p(o)); break;
     case LUA_TLCL: {
