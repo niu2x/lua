@@ -1178,6 +1178,8 @@ void luaC_fullgc (lua_State *L, int isemergency) {
 /* }====================================================== */
 
 
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+
 typedef void (*walk_GCObject_visitor)(GCObject *o, void *);
 static void walk_GCObject(GCObject *o, walk_GCObject_visitor visitor, void *user_data) {
   while(o){
@@ -1208,8 +1210,9 @@ static const char *get_type_name(lu_byte tt) {
     }
   }
 
-  if(tt+1 < LUA_TOTALTAGS)
+  if(tt+1 < LUA_TOTALTAGS) {
     return luaT_typenames_[tt + 1];
+  }
 
   return "Unknown Type";
 }
@@ -1218,13 +1221,64 @@ typedef struct {
   int age;
 }DumpCondition;
 
-static void test(GCObject *o, void *user_data) {
+
+static void print_string_with_escapes(FILE *fp,  const char *str, size_t len) {
+  while (len --) {
+    if (isprint((unsigned char)*str)) {
+      fputc(*str, fp);
+    } else {
+        switch (*str) {
+          case '\n':
+            fprintf(fp, "\\n");
+            break;
+          case '\t':
+            fprintf(fp, "\\t");
+            break;
+          case '\r':
+            fprintf(fp, "\\r");
+            break;
+          case '\v':
+            fprintf(fp, "\\v");
+            break;
+          case '\f':
+            fprintf(fp, "\\f");
+            break;
+          case '\a':
+            fprintf(fp, "\\a");
+            break;
+          case '\\':
+            fprintf(fp, "\\\\");
+            break;
+          default:
+            fprintf(fp, "\\x%02x", (unsigned char)*str);
+            break;
+        }
+    }
+    str++;
+  }
+}
+
+
+static void show_obj_info(GCObject *o, FILE *fp) {
+  fprintf(fp, "obj: %p\n", o);
+  fprintf(fp, "  tt: %s (%02x)\n", get_type_name(o->tt) , o->tt);
+  fprintf(fp, "  age: %d\n", o->inspect_age);
+
+  if((o->tt & 0x0F) == LUA_TSTRING) {
+    TString *str = (TString*)(o);
+    fprintf(fp, "  str length: %ld\n", tsslen(str));
+    size_t showed_str_len = MIN(tsslen(str), 64);
+    fprintf(fp, "  str value: ");
+    print_string_with_escapes(fp, getstr(str), showed_str_len);
+    fprintf(fp, "\n");
+  }
+}
+
+static void dump_obj(GCObject *o, void *user_data) {
   DumpCondition *condition = (DumpCondition *)user_data;
 
   if(condition->age == -1 || condition->age == o->inspect_age) {
-    printf("obj: %p\n", o);
-    printf("  tt: %s (%02x)\n", get_type_name(o->tt) , o->tt);
-    printf("  age: %d\n", o->inspect_age);
+    show_obj_info(o, stdout);
   }
 }
 
@@ -1235,7 +1289,7 @@ void lua_inspect_dump(lua_State* L, int16_t age_for_dump, const char *save_file)
   DumpCondition condition = {
     .age = age_for_dump,
   };
-  walk_GCObject(root, test, &condition);
+  walk_GCObject(root, dump_obj, &condition);
 }
 
 int16_t current_inspect_age = 0;
