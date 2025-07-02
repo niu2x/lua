@@ -1355,7 +1355,8 @@ const char * lua_inspect_get_birth_place(lua_State *L, void *addr) {
 }
 
 static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target);
-static GCObject* search_table(lua_State *L,  Table *h, void *target);
+static GCObject* search_Table(lua_State *L,  Table *h, void *target);
+static GCObject* search_LClosure(lua_State *L,  LClosure *h, void *target);
 
 
 static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
@@ -1373,17 +1374,19 @@ static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
   switch (o->tt) {
     case LUA_TTABLE: {
       Table *h = gco2t(o);
-      GCObject *result = search_table(L, h, target);
+      GCObject *result = search_Table(L, h, target);
       if(result)
         return result;
       break;
     }
-    // case LUA_TLCL: {
-    //   LClosure *cl = gco2lcl(o);
-    //   g->gray = cl->gclist;  /* remove from 'gray' list */
-    //   size = traverseLclosure(g, cl);
-    //   break;
-    // }
+    case LUA_TLCL: {
+      LClosure *cl = gco2lcl(o);
+      GCObject *result = search_LClosure(L, cl, target);
+      if(result)
+        return result;
+      break;
+
+    }
     // case LUA_TCCL: {
     //   CClosure *cl = gco2ccl(o);
     //   g->gray = cl->gclist;  /* remove from 'gray' list */
@@ -1411,7 +1414,35 @@ static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
 }
 
 
-static GCObject* search_table(lua_State *L, Table *h, void *target) {
+static GCObject* search_LClosure(lua_State *L,  LClosure *cl, void *target) {
+  int i;
+  GCObject *result;
+
+  result = search_GCObject(L, cl->p, target);
+  if(result) {
+    cl->p->path = cl;
+    cl->p->path_desc = "proto";
+    return result;
+  }
+
+  for (i = 0; i < cl->nupvalues; i++) {  /* mark its upvalues */
+    UpVal *uv = cl->upvals[i];
+    if (uv != NULL) {
+      if(iscollectable(uv->v)){
+        result = search_GCObject(L, gcvalue(uv->v), target);
+        if(result) {
+          gcvalue(uv->v)->path = cl;
+          gcvalue(uv->v)->path_desc = "uv";
+          return result;
+        }
+      }
+    }
+  }
+  return NULL;
+}
+
+
+static GCObject* search_Table(lua_State *L, Table *h, void *target) {
   GCObject *result = search_GCObject(L, h->metatable, target);
   if(result) {
     h->metatable->path = h;
