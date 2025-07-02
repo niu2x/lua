@@ -1243,6 +1243,7 @@ static const char *get_type_name(lu_byte tt) {
 typedef struct {
   int query_age;
   FILE *fp;
+  lua_State *L;
 }DumpContext;
 
 
@@ -1283,19 +1284,27 @@ static void print_string_with_escapes(FILE *fp,  const char *str, size_t len) {
 }
 
 
-static void show_obj_info(GCObject *o, FILE *fp) {
+static void show_obj_info(lua_State *L, GCObject *o, FILE *fp) {
   fprintf(fp, "obj: %p\n", o);
   fprintf(fp, "  tt: %s (%02x)\n", get_type_name(o->tt) , o->tt);
-  fprintf(fp, "  age: %d\n", o->inspect_age);
-  fprintf(fp, "  birth_place: %s\n", o->birth_place);
+  fprintf(fp, "  birth_place: %s\n", o->birth_place?:"Unknown");
 
   if((o->tt & 0x0F) == LUA_TSTRING) {
     TString *str = (TString*)(o);
     fprintf(fp, "  str length: %ld\n", tsslen(str));
-    size_t showed_str_len = MIN(tsslen(str), 64);
+    size_t showed_str_len = MIN(tsslen(str), 128);
     fprintf(fp, "  str value: ");
     print_string_with_escapes(fp, getstr(str), showed_str_len);
+    if(tsslen(str) > 128) {
+      fprintf(fp, "...");
+    }
     fprintf(fp, "\n");
+  }
+
+  if((o->tt & 0x0F) == LUA_TTABLE) {
+    if(o == G(L)->weak_global_table) {
+      fprintf(fp, "  _G\n");
+    }
   }
 }
 
@@ -1303,7 +1312,7 @@ static void dump_obj(GCObject *o, void *user_data) {
   DumpContext *context = (DumpContext *)user_data;
 
   if(context->query_age == -1 || context->query_age == o->inspect_age) {
-    show_obj_info(o, context->fp);
+    show_obj_info(context->L, o, context->fp);
   }
 }
 
@@ -1319,7 +1328,8 @@ void lua_inspect_dump(lua_State* L, int16_t age_for_dump, const char *save_file)
 
   DumpContext context = {
     .query_age = age_for_dump,
-    .fp = fp
+    .fp = fp,
+    .L = L,
   };
 
   walk_GCObject(root, dump_obj, &context);
@@ -1335,7 +1345,7 @@ int lua_inspect_get_all_gc_count(lua_State *L) {
   int count = 0;
   while(o) {
     ++count;
-    o=o->next;
+    o = o->next;
   }
   return count;
 }
@@ -1569,7 +1579,7 @@ static GCObject* search_Table(lua_State *L, Table *h, void *target) {
   return NULL;
 }
 
-static void reset_flag(GCObject *o, void *user_data) {o->inspect_tmp_flag = 0; o->path=NULL; o->path_desc = "";}
+static void reset_flag(GCObject *o, void *user_data) {o->inspect_tmp_flag = 0; o->path=NULL; o->path_desc = NULL;}
 
 static char temp_outbuf[16*1024];
 
@@ -1590,19 +1600,35 @@ const char * lua_inspect_get_ref_path(lua_State *L, void *addr) {
     memset(temp_outbuf, 0, 16*1024);
     FILE *fp = fmemopen(temp_outbuf, sizeof(temp_outbuf), "w");
 
-    while(target) {
-      show_obj_info(target, fp);
-      fprintf(fp, "path_desc: %s\n", target->path_desc);
-      target = target->path;
+    // revert path link list
+    GCObject *p = target;
+    GCObject *tmp_last = NULL;
+    while(p) {
+      GCObject *next = p->path;
+      p->path = tmp_last;
+      tmp_last = p;
+      p = next;
+    }
+
+    p = tmp_last;
+
+    while(p) {
+      p->path_desc = p->path?p->path->path_desc: NULL;
+      p=p->path;
+    }
+
+    p = tmp_last;
+
+    while(p) {
+      show_obj_info(L, p, fp);
+      if( p->path_desc){
+        fprintf(fp, "->(%s)\n", p->path_desc);
+      }
+      p = p->path;
     }
 
     fclose(fp);
     return temp_outbuf;
   }
-
-
-
-
-
   return NULL;
 }
