@@ -1367,6 +1367,7 @@ static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
 
   if(o->inspect_tmp_flag) 
     return NULL;
+
   o->inspect_tmp_flag = 1;
 
   if(o == target) {
@@ -1570,7 +1571,7 @@ static GCObject* search_Table(lua_State *L, Table *h, void *target) {
 
 static void reset_flag(GCObject *o, void *user_data) {o->inspect_tmp_flag = 0; o->path=NULL; o->path_desc = "";}
 
-static char temp_outbuf[4096];
+static char temp_outbuf[16*1024];
 
 const char * lua_inspect_get_ref_path(lua_State *L, void *addr) {
   GCObject* target;
@@ -1586,6 +1587,7 @@ const char * lua_inspect_get_ref_path(lua_State *L, void *addr) {
   }
 
   if(target) {
+    memset(temp_outbuf, 0, 16*1024);
     FILE *fp = fmemopen(temp_outbuf, sizeof(temp_outbuf), "w");
 
     while(target) {
