@@ -275,23 +275,43 @@ static int luaB_inspect(lua_State *L) {
         lua_pushnil(L);
       }
       else {
+        int n = 0;
         switch(obj->tt & 0x0F) {
           case LUA_TSTRING: {
             lua_pushstring(L, getstr(gco2ts(obj)));
+            n = 1;
             break;
           }
           case LUA_TTABLE: {
             Table *h = gco2t(obj);
             lua_pushnil(L);
             sethvalue(L, L->top-1, h);
+            n = 1;
             break;
           }
-          default: {
-            lua_pushstring(L, "(");
-            lua_pushstring(L, lua_inspect_get_type_name(obj->tt));
-            lua_pushstring(L, ")");
-            lua_concat(L, 3);
+
+          case LUA_TFUNCTION: {
+            if(obj->tt == LUA_TLCL) {
+              LClosure *cl = gco2lcl(obj);
+              lua_pushnil(L);
+              setclLvalue(L, L->top-1, cl);
+              n = 1;
+            } 
+            else if(obj->tt == LUA_TCCL) {
+              CClosure *cl = gco2ccl(obj);
+              lua_pushnil(L);
+              setclCvalue(L, L->top-1, cl);
+              n = 1;
+            }
+            break;
           }
+        }
+
+        if(n == 0) {
+          lua_pushstring(L, "(");
+          lua_pushstring(L, lua_inspect_get_type_name(obj->tt));
+          lua_pushstring(L, ")");
+          lua_concat(L, 3);
         }
       }
 
