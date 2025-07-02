@@ -1357,6 +1357,7 @@ const char * lua_inspect_get_birth_place(lua_State *L, void *addr) {
 static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target);
 static GCObject* search_Table(lua_State *L,  Table *h, void *target);
 static GCObject* search_LClosure(lua_State *L,  LClosure *h, void *target);
+static GCObject* search_CClosure(lua_State *L,  CClosure *h, void *target);
 
 
 static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
@@ -1387,12 +1388,14 @@ static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
       break;
 
     }
-    // case LUA_TCCL: {
-    //   CClosure *cl = gco2ccl(o);
-    //   g->gray = cl->gclist;  /* remove from 'gray' list */
-    //   size = traverseCclosure(g, cl);
-    //   break;
-    // }
+    case LUA_TCCL: {
+      CClosure *cl = gco2ccl(o);
+      GCObject *result = search_CClosure(L, cl, target);
+      if(result)
+        return result;
+      break;
+
+    }
     // case LUA_TTHREAD: {
     //   lua_State *th = gco2th(o);
     //   g->gray = th->gclist;  /* remove from 'gray' list */
@@ -1435,6 +1438,26 @@ static GCObject* search_LClosure(lua_State *L,  LClosure *cl, void *target) {
           gcvalue(uv->v)->path_desc = "uv";
           return result;
         }
+      }
+    }
+  }
+  return NULL;
+}
+
+
+
+static GCObject* search_CClosure(lua_State *L,  CClosure *cl, void *target) {
+  int i;
+  GCObject *result;
+
+  for (i = 0; i < cl->nupvalues; i++) {  /* mark its upvalues */
+    TValue *tv = &(cl->upvalue[i]);
+    if(iscollectable(tv)){
+      result = search_GCObject(L, gcvalue(tv), target);
+      if(result) {
+        gcvalue(tv)->path = cl;
+        gcvalue(tv)->path_desc = "uv";
+        return result;
       }
     }
   }
