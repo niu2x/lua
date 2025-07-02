@@ -205,15 +205,17 @@ static int luaB_inspect(lua_State *L) {
     INSPECT_GET_AGE,
     INSPECT_GET_ALL_GC_COUNT,
     INSPECT_GET_BIRTH_PLACE,
+    INSPECT_GET_REF_PATH,
   };
 
-  static const char *const opts[] = {"dump","set_age", "get_age", "get_all_gc_count", "get_birth_place",NULL};
+  static const char *const opts[] = {"dump","set_age", "get_age", "get_all_gc_count", "get_birth_place", "get_ref_path", NULL};
   static const int optsnum[] = {
     INSPECT_DUMP,
     INSPECT_SET_AGE, 
     INSPECT_GET_AGE,
     INSPECT_GET_ALL_GC_COUNT,
     INSPECT_GET_BIRTH_PLACE,
+    INSPECT_GET_REF_PATH,
   };
 
   int o = optsnum[luaL_checkoption(L, 1, "inspect", opts)];
@@ -244,6 +246,13 @@ static int luaB_inspect(lua_State *L) {
       const char *addr_str = luaL_checkstring(L, 2);
       void* addr = (void*)strtoull(addr_str, NULL, 0);
       lua_pushstring(L, lua_inspect_get_birth_place(L, addr)?:"Unknown");
+      return 1;
+    }
+
+    case INSPECT_GET_REF_PATH: {
+      const char *addr_str = luaL_checkstring(L, 2);
+      void* addr = (void*)strtoull(addr_str, NULL, 0);
+      lua_pushstring(L, lua_inspect_get_ref_path(L, addr)?:"Unknown");
       return 1;
     }
 
@@ -542,6 +551,8 @@ static const luaL_Reg base_funcs[] = {
 LUAMOD_API int luaopen_base (lua_State *L) {
   /* open lib into global table */
   lua_pushglobaltable(L);
+  G(L)->weak_global_table =  gcvalue(L->top-1);
+
   luaL_setfuncs(L, base_funcs, 0);
   /* set global _G */
   lua_pushvalue(L, -1);

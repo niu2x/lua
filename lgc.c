@@ -24,7 +24,11 @@
 #include "lstring.h"
 #include "ltable.h"
 #include "ltm.h"
+
 #include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include "fmemopen.h"
 
 /*
 ** internal state for collector while inside the atomic phase. The
@@ -1283,6 +1287,7 @@ static void show_obj_info(GCObject *o, FILE *fp) {
   fprintf(fp, "obj: %p\n", o);
   fprintf(fp, "  tt: %s (%02x)\n", get_type_name(o->tt) , o->tt);
   fprintf(fp, "  age: %d\n", o->inspect_age);
+  fprintf(fp, "  birth_place: %s\n", o->birth_place);
 
   if((o->tt & 0x0F) == LUA_TSTRING) {
     TString *str = (TString*)(o);
@@ -1346,5 +1351,140 @@ const char * lua_inspect_get_birth_place(lua_State *L, void *addr) {
     }
     o=o->next;
   }
+  return NULL;
+}
+
+static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target);
+static GCObject* search_table(lua_State *L,  Table *h, void *target);
+
+
+static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
+  if(!o)
+    return NULL;
+
+  if(o->inspect_tmp_flag) 
+    return NULL;
+  o->inspect_tmp_flag = 1;
+
+  if(o == target) {
+    return o;
+  }
+
+  switch (o->tt) {
+    case LUA_TTABLE: {
+      Table *h = gco2t(o);
+      GCObject *result = search_table(L, h, target);
+      if(result)
+        return result;
+      break;
+    }
+    // case LUA_TLCL: {
+    //   LClosure *cl = gco2lcl(o);
+    //   g->gray = cl->gclist;  /* remove from 'gray' list */
+    //   size = traverseLclosure(g, cl);
+    //   break;
+    // }
+    // case LUA_TCCL: {
+    //   CClosure *cl = gco2ccl(o);
+    //   g->gray = cl->gclist;  /* remove from 'gray' list */
+    //   size = traverseCclosure(g, cl);
+    //   break;
+    // }
+    // case LUA_TTHREAD: {
+    //   lua_State *th = gco2th(o);
+    //   g->gray = th->gclist;  /* remove from 'gray' list */
+    //   linkgclist(th, g->grayagain);  /* insert into 'grayagain' list */
+    //   black2gray(o);
+    //   size = traversethread(g, th);
+    //   break;
+    // }
+    // case LUA_TPROTO: {
+    //   Proto *p = gco2p(o);
+    //   g->gray = p->gclist;  /* remove from 'gray' list */
+    //   size = traverseproto(g, p);
+    //   break;
+    // }
+  }
+
+  return NULL;
+
+}
+
+
+static GCObject* search_table(lua_State *L, Table *h, void *target) {
+  const char *weakkey, *weakvalue;
+  const TValue *mode = gfasttm(G(L), h->metatable, TM_MODE);
+  
+  GCObject *result = search_GCObject(L, h->metatable, target);
+  if(result) {
+    h->metatable->path = h;
+    h->metatable->path_desc = "metatable";
+    return result;
+  }
+
+  Node *n, *limit = gnodelast(h);
+  unsigned int i;
+  for (i = 0; i < h->sizearray; i++){
+    TValue *tv = &h->array[i];
+    if(iscollectable(tv)) {
+      GCObject *obj = gcvalue(tv);
+      result = search_GCObject(L, obj, target);
+      if(result) {
+        obj->path = h;
+        obj->path_desc = "array_value";
+        return result;
+      }
+    }
+  }
+  for (n = gnode(h, 0); n < limit; n++) {  /* traverse hash part */
+    TValue *tv = gval(n);
+    if(iscollectable(tv)) {
+      GCObject *obj = gcvalue(tv);
+      result = search_GCObject(L, obj, target);
+      if(result) {
+        obj->path = h;
+        obj->path_desc = "map_value";
+        return result;
+      }
+    }
+
+    tv = gkey(n);
+    if(iscollectable(tv)) {
+      GCObject *obj = gcvalue(tv);
+      result = search_GCObject(L, obj, target);
+      if(result) {
+        obj->path = h;
+        obj->path_desc = "map_key";
+        return result;
+      }
+    }
+  }
+  return NULL;
+}
+
+static void reset_flag(GCObject *o, void *user_data) {o->inspect_tmp_flag = 0; o->path=NULL; o->path_desc = "";}
+
+static char temp_outbuf[4096];
+
+const char * lua_inspect_get_ref_path(lua_State *L, void *addr) {
+  global_State *g = G(L);
+  GCObject* o = g->allgc;
+
+  walk_GCObject(o, reset_flag,NULL);
+
+  GCObject* target = search_GCObject(L, g->weak_global_table, addr);
+  if(target) {
+    FILE *fp = fmemopen(temp_outbuf, sizeof(temp_outbuf), "w");
+
+    while(target) {
+      show_obj_info(target, fp);
+      fprintf(fp, "path_desc: %s\n", target->path_desc);
+      target = target->path;
+    }
+
+    fclose(fp);
+    return temp_outbuf;
+  }
+
   return NULL;
 }
