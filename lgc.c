@@ -1358,6 +1358,7 @@ static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target);
 static GCObject* search_Table(lua_State *L,  Table *h, void *target);
 static GCObject* search_LClosure(lua_State *L,  LClosure *h, void *target);
 static GCObject* search_CClosure(lua_State *L,  CClosure *h, void *target);
+static GCObject* search_Proto(lua_State *L,  Proto *h, void *target);
 
 
 static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
@@ -1396,20 +1397,18 @@ static GCObject* search_GCObject(lua_State *L, GCObject *o, void *target) {
       break;
 
     }
-    // case LUA_TTHREAD: {
-    //   lua_State *th = gco2th(o);
-    //   g->gray = th->gclist;  /* remove from 'gray' list */
-    //   linkgclist(th, g->grayagain);  /* insert into 'grayagain' list */
-    //   black2gray(o);
-    //   size = traversethread(g, th);
-    //   break;
-    // }
-    // case LUA_TPROTO: {
-    //   Proto *p = gco2p(o);
-    //   g->gray = p->gclist;  /* remove from 'gray' list */
-    //   size = traverseproto(g, p);
-    //   break;
-    // }
+    case LUA_TTHREAD: {
+      break;
+    }
+
+    case LUA_TPROTO: {
+      Proto *p = gco2p(o);
+      GCObject *result = search_Proto(L, p, target);
+      if(result)
+        return result;
+      break;
+
+    }
   }
 
   return NULL;
@@ -1459,6 +1458,62 @@ static GCObject* search_CClosure(lua_State *L,  CClosure *cl, void *target) {
         gcvalue(tv)->path_desc = "uv";
         return result;
       }
+    }
+  }
+  return NULL;
+}
+
+static GCObject* search_Proto(lua_State *L,  Proto *p, void *target) {
+  int i;
+  GCObject *result;
+  
+  result =   search_GCObject(L, p->source, target);
+  if(result) {
+    p->source->path = p;
+    p->source->path_desc = "source";
+    return result;
+  }
+
+  for (i = 0; i < p->sizek; i++) {
+    if(iscollectable(&p->k[i])){
+      GCObject *gco = gcvalue(&p->k[i]);
+      result = search_GCObject(L, gco, target);
+      if(result) {
+        gco->path = p;
+        gco->path_desc = "constant";
+        return result;
+      }
+
+    }
+  }
+
+  for (i = 0; i < p->sizeupvalues; i++){
+    GCObject *gco = p->upvalues[i].name;
+    result = search_GCObject(L, gco, target);
+    if(result) {
+      gco->path = p;
+      gco->path_desc = "uv name";
+      return result;
+    }
+
+
+  }
+  for (i = 0; i < p->sizep; i++){
+    GCObject *gco = p->p[i];
+    result = search_GCObject(L, gco, target);
+    if(result) {
+      gco->path = p;
+      gco->path_desc = "nest proto";
+      return result;
+    }
+  }
+  for (i = 0; i < p->sizelocvars; i++) {
+    GCObject *gco = p->locvars[i].varname;
+    result = search_GCObject(L, gco, target);
+    if(result) {
+      gco->path = p;
+      gco->path_desc = "local var name";
+      return result;
     }
   }
   return NULL;
