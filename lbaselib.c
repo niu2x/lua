@@ -19,6 +19,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lgc.h"
 
 
 static int luaB_print (lua_State *L) {
@@ -199,27 +200,30 @@ static int luaB_collectgarbage (lua_State *L) {
 
 static int luaB_inspect(lua_State *L) {
   enum {
-    CAPTURE,
-    DUMP_CAPTURE,
-    COMPARE_CAPTURE,
+    INSPECT_CAPTURE,
+    INSPECT_DUMP_CAPTURE,
+    INSPECT_COMPARE_CAPTURE,
+    INSPECT_DUMP,
   };
 
-  static const char *const opts[] = {"capture", "dump_capture", "compare_capture", NULL};
-  static const int optsnum[] = {CAPTURE, DUMP_CAPTURE, COMPARE_CAPTURE};
+  static const char *const opts[] = {"capture", "dump_capture", "compare_capture",  "dump", NULL};
+  static const int optsnum[] = {INSPECT_CAPTURE, INSPECT_DUMP_CAPTURE, INSPECT_COMPARE_CAPTURE, INSPECT_DUMP};
 
-  int o = optsnum[luaL_checkoption(L, 1, "collect", opts)];
-  int ex = (int)luaL_optinteger(L, 2, 0);
-  int res = lua_gc(L, o, ex);
+  int o = optsnum[luaL_checkoption(L, 1, "inspect", opts)];
   switch (o) {
-    case CAPTURE: {
+    case INSPECT_CAPTURE: {
       return 0;
     }
-    case DUMP_CAPTURE: {
+    case INSPECT_DUMP_CAPTURE: {
       return 0;
     }
-    case COMPARE_CAPTURE: {
+    case INSPECT_COMPARE_CAPTURE: {
       return 0;
-
+    }
+    case INSPECT_DUMP: {
+      const char *save_file = luaL_optstring(L, 2, NULL);
+      lua_inspect_dump(L, save_file);
+      return 0;
     }
     default: {
       return 0;

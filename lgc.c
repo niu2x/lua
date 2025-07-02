@@ -24,7 +24,7 @@
 #include "lstring.h"
 #include "ltable.h"
 #include "ltm.h"
-
+#include <stdio.h>
 
 /*
 ** internal state for collector while inside the atomic phase. The
@@ -1177,3 +1177,51 @@ void luaC_fullgc (lua_State *L, int isemergency) {
 /* }====================================================== */
 
 
+typedef void (*walk_GCObject_visitor)(GCObject *o);
+static void walk_GCObject(GCObject *o, walk_GCObject_visitor visitor) {
+  while(o){
+    visitor(o);
+    o = o->next;
+  }
+}
+
+static const char *get_type_name(lu_byte tt) {
+  
+
+  if((tt & 0x0F) == LUA_TFUNCTION) {
+    if(tt == (LUA_TLCL)) {
+      return "Lua closure";
+    }
+    if(tt == (LUA_TLCF)) {
+      return "Light C function";
+    }
+    if(tt == (LUA_TCCL)) {
+      return "C closure";
+    }
+  }
+
+  if((tt & 0x0F) == LUA_TSTRING) {
+    if(tt == (LUA_TSHRSTR)) {
+      return "Short String";
+    }
+    if(tt == (LUA_TLNGSTR)) {
+      return "Long String";
+    }
+  }
+
+  if(tt+1 < LUA_TOTALTAGS)
+    return luaT_typenames_[tt + 1];
+
+  return "Unknown Type";
+}
+
+static void test(GCObject *o) {
+  printf("obj: %p\n", o);
+  printf("  tt: %s (%02x)\n", get_type_name(o->tt) , o->tt);
+}
+
+void lua_inspect_dump(lua_State* L, const char *save_file) {
+  global_State *g = G(L);
+  GCObject* root = g->allgc;
+  walk_GCObject(root, test);
+}
