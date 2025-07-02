@@ -203,19 +203,30 @@ static int luaB_inspect(lua_State *L) {
     INSPECT_DUMP,
     INSPECT_SET_AGE,
     INSPECT_GET_AGE,
-    INSPECT_GET_ALL_GC_COUNT,
+    INSPECT_GET_ALL_GCO_COUNT,
     INSPECT_GET_BIRTH_PLACE,
     INSPECT_GET_REF_PATH,
+    INSPECT_GET_GCO,
   };
 
-  static const char *const opts[] = {"dump","set_age", "get_age", "get_all_gc_count", "get_birth_place", "get_ref_path", NULL};
+  static const char *const opts[] = {
+    "dump",
+    "set_age", 
+    "get_age", 
+    "get_all_gco_count", 
+    "get_birth_place", 
+    "get_ref_path", 
+    "get_gco",
+    NULL,
+  };
   static const int optsnum[] = {
     INSPECT_DUMP,
     INSPECT_SET_AGE, 
     INSPECT_GET_AGE,
-    INSPECT_GET_ALL_GC_COUNT,
+    INSPECT_GET_ALL_GCO_COUNT,
     INSPECT_GET_BIRTH_PLACE,
     INSPECT_GET_REF_PATH,
+    INSPECT_GET_GCO,
   };
 
   int o = optsnum[luaL_checkoption(L, 1, "inspect", opts)];
@@ -237,8 +248,8 @@ static int luaB_inspect(lua_State *L) {
       return 1;
     }
 
-    case INSPECT_GET_ALL_GC_COUNT: {
-      lua_pushinteger(L, lua_inspect_get_all_gc_count(L));
+    case INSPECT_GET_ALL_GCO_COUNT: {
+      lua_pushinteger(L, lua_inspect_get_all_gco_count(L));
       return 1;
     }
 
@@ -253,6 +264,37 @@ static int luaB_inspect(lua_State *L) {
       const char *addr_str = luaL_checkstring(L, 2);
       void* addr = (void*)strtoull(addr_str, NULL, 0);
       lua_pushstring(L, lua_inspect_get_ref_path(L, addr)?:"Unknown");
+      return 1;
+    }
+
+    case INSPECT_GET_GCO: {
+      const char *addr_str = luaL_checkstring(L, 2);
+      void* addr = (void*)strtoull(addr_str, NULL, 0);
+      GCObject *obj = lua_inspect_get_gco(L, addr);
+      if(!obj) {
+        lua_pushnil(L);
+      }
+      else {
+        switch(obj->tt & 0x0F) {
+          case LUA_TSTRING: {
+            lua_pushstring(L, getstr(gco2ts(obj)));
+            break;
+          }
+          case LUA_TTABLE: {
+            Table *h = gco2t(obj);
+            lua_pushnil(L);
+            sethvalue(L, L->top-1, h);
+            break;
+          }
+          default: {
+            lua_pushstring(L, "(");
+            lua_pushstring(L, lua_inspect_get_type_name(obj->tt));
+            lua_pushstring(L, ")");
+            lua_concat(L, 3);
+          }
+        }
+      }
+
       return 1;
     }
 

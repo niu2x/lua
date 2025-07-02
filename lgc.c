@@ -1236,8 +1236,11 @@ static const char *get_type_name(lu_byte tt) {
   if(tt+1 < LUA_TOTALTAGS) {
     return luaT_typenames_[tt + 1];
   }
-
   return "Unknown Type";
+}
+
+const char *lua_inspect_get_type_name(lu_byte tt) {
+  return get_type_name(tt);
 }
 
 typedef struct {
@@ -1339,7 +1342,7 @@ void lua_inspect_dump(lua_State* L, int16_t age_for_dump, const char *save_file)
   }
 }
 
-int lua_inspect_get_all_gc_count(lua_State *L) {
+int lua_inspect_get_all_gco_count(lua_State *L) {
   global_State *g = G(L);
   GCObject* o = g->allgc;
   int count = 0;
@@ -1630,5 +1633,15 @@ const char * lua_inspect_get_ref_path(lua_State *L, void *addr) {
     fclose(fp);
     return temp_outbuf;
   }
+  return NULL;
+}
+
+GCObject *lua_inspect_get_gco(lua_State *L, void *addr) {
+  GCObject* target;
+  global_State *g = G(L);
+  GCObject* o = g->allgc;
+  while(o && o != addr) o = o->next;
+  if(o == addr)
+    return o;
   return NULL;
 }
