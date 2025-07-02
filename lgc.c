@@ -223,9 +223,9 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
     if(L->ci->func) {
       if(ttisLclosure(L->ci->func)) {
         Proto *proto = getproto(L->ci->func);
-        char *buffer = malloc(64);
-        snprintf(buffer, 64, "proto source %s:%d\n", getstr(proto->source), proto->lineinfo[L->ci->u.l.savedpc - proto->code]);
-        buffer[63] = 0;
+        char *buffer = malloc(128);
+        snprintf(buffer, 128, "proto source %s:%d\n", getstr(proto->source), proto->lineinfo[L->ci->u.l.savedpc - proto->code]);
+        buffer[128-1] = 0;
         o->birth_place = buffer;
       }
     }
@@ -1468,7 +1468,7 @@ static GCObject* search_Proto(lua_State *L,  Proto *p, void *target) {
   int i;
   GCObject *result;
   
-  result =   search_GCObject(L, p->source, target);
+  result = search_GCObject(L, p->source, target);
   if(result) {
     p->source->path = p;
     p->source->path_desc = "source";
