@@ -204,14 +204,16 @@ static int luaB_inspect(lua_State *L) {
     INSPECT_SET_AGE,
     INSPECT_GET_AGE,
     INSPECT_GET_ALL_GC_COUNT,
+    INSPECT_GET_BIRTH_PLACE,
   };
 
-  static const char *const opts[] = {"dump","set_age", "get_age", "get_all_gc_count", NULL};
+  static const char *const opts[] = {"dump","set_age", "get_age", "get_all_gc_count", "get_birth_place",NULL};
   static const int optsnum[] = {
     INSPECT_DUMP,
     INSPECT_SET_AGE, 
     INSPECT_GET_AGE,
     INSPECT_GET_ALL_GC_COUNT,
+    INSPECT_GET_BIRTH_PLACE,
   };
 
   int o = optsnum[luaL_checkoption(L, 1, "inspect", opts)];
@@ -235,6 +237,13 @@ static int luaB_inspect(lua_State *L) {
 
     case INSPECT_GET_ALL_GC_COUNT: {
       lua_pushinteger(L, lua_inspect_get_all_gc_count(L));
+      return 1;
+    }
+
+    case INSPECT_GET_BIRTH_PLACE: {
+      const char *addr_str = luaL_checkstring(L, 2);
+      void* addr = (void*)strtoull(addr_str, NULL, 0);
+      lua_pushstring(L, lua_inspect_get_birth_place(L, addr)?:"Unknown");
       return 1;
     }
 

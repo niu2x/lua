@@ -146,6 +146,7 @@ LUAI_FUNC void luaC_upvdeccount (lua_State *L, UpVal *uv);
 
 void lua_inspect_dump(lua_State* L, int16_t age_for_dump, const char *save_file);
 int lua_inspect_get_all_gc_count(lua_State *L);
+const char *lua_inspect_get_birth_place(lua_State *L, void *addr);
 
 extern int16_t current_inspect_age;
 

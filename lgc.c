@@ -1336,3 +1336,15 @@ int lua_inspect_get_all_gc_count(lua_State *L) {
 }
 
 int16_t current_inspect_age = 0;
+
+const char * lua_inspect_get_birth_place(lua_State *L, void *addr) {
+  global_State *g = G(L);
+  GCObject* o = g->allgc;
+  while(o) {
+    if(o == addr) {
+      return o->birth_place ;
+    }
+    o=o->next;
+  }
+  return NULL;
+}
