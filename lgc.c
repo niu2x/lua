@@ -1292,4 +1292,15 @@ void lua_inspect_dump(lua_State* L, int16_t age_for_dump, const char *save_file)
   walk_GCObject(root, dump_obj, &condition);
 }
 
+int lua_inspect_get_all_gc_count(lua_State *L) {
+  global_State *g = G(L);
+  GCObject* o = g->allgc;
+  int count = 0;
+  while(o) {
+    ++count;
+    o=o->next;
+  }
+  return count;
+}
+
 int16_t current_inspect_age = 0;

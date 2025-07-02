@@ -203,10 +203,16 @@ static int luaB_inspect(lua_State *L) {
     INSPECT_DUMP,
     INSPECT_SET_AGE,
     INSPECT_GET_AGE,
+    INSPECT_GET_ALL_GC_COUNT,
   };
 
-  static const char *const opts[] = {"dump","set_age", "get_age", NULL};
-  static const int optsnum[] = {INSPECT_DUMP,INSPECT_SET_AGE, INSPECT_GET_AGE };
+  static const char *const opts[] = {"dump","set_age", "get_age", "get_all_gc_count", NULL};
+  static const int optsnum[] = {
+    INSPECT_DUMP,
+    INSPECT_SET_AGE, 
+    INSPECT_GET_AGE,
+    INSPECT_GET_ALL_GC_COUNT,
+  };
 
   int o = optsnum[luaL_checkoption(L, 1, "inspect", opts)];
   switch (o) {
@@ -226,6 +232,12 @@ static int luaB_inspect(lua_State *L) {
       lua_pushinteger(L, current_inspect_age);
       return 1;
     }
+
+    case INSPECT_GET_ALL_GC_COUNT: {
+      lua_pushinteger(L, lua_inspect_get_all_gc_count(L));
+      return 1;
+    }
+
     default: {
       return 0;
     }
