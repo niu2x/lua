@@ -197,6 +197,35 @@ static int luaB_collectgarbage (lua_State *L) {
   }
 }
 
+static int luaB_inspect(lua_State *L) {
+  enum {
+    CAPTURE,
+    DUMP_CAPTURE,
+    COMPARE_CAPTURE,
+  };
+
+  static const char *const opts[] = {"capture", "dump_capture", "compare_capture", NULL};
+  static const int optsnum[] = {CAPTURE, DUMP_CAPTURE, COMPARE_CAPTURE};
+
+  int o = optsnum[luaL_checkoption(L, 1, "collect", opts)];
+  int ex = (int)luaL_optinteger(L, 2, 0);
+  int res = lua_gc(L, o, ex);
+  switch (o) {
+    case CAPTURE: {
+      return 0;
+    }
+    case DUMP_CAPTURE: {
+      return 0;
+    }
+    case COMPARE_CAPTURE: {
+      return 0;
+
+    }
+    default: {
+      return 0;
+    }
+  }
+}
 
 static int luaB_type (lua_State *L) {
   int t = lua_type(L, 1);
@@ -453,6 +482,7 @@ static int luaB_tostring (lua_State *L) {
 static const luaL_Reg base_funcs[] = {
   {"assert", luaB_assert},
   {"collectgarbage", luaB_collectgarbage},
+  {"inspect", luaB_inspect},
   {"dofile", luaB_dofile},
   {"error", luaB_error},
   {"getmetatable", luaB_getmetatable},
