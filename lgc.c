@@ -1218,8 +1218,9 @@ static const char *get_type_name(lu_byte tt) {
 }
 
 typedef struct {
-  int age;
-}DumpCondition;
+  int query_age;
+  FILE *fp;
+}DumpContext;
 
 
 static void print_string_with_escapes(FILE *fp,  const char *str, size_t len) {
@@ -1275,10 +1276,10 @@ static void show_obj_info(GCObject *o, FILE *fp) {
 }
 
 static void dump_obj(GCObject *o, void *user_data) {
-  DumpCondition *condition = (DumpCondition *)user_data;
+  DumpContext *context = (DumpContext *)user_data;
 
-  if(condition->age == -1 || condition->age == o->inspect_age) {
-    show_obj_info(o, stdout);
+  if(context->query_age == -1 || context->query_age == o->inspect_age) {
+    show_obj_info(o, context->fp);
   }
 }
 
@@ -1286,10 +1287,22 @@ void lua_inspect_dump(lua_State* L, int16_t age_for_dump, const char *save_file)
   global_State *g = G(L);
   GCObject* root = g->allgc;
 
-  DumpCondition condition = {
-    .age = age_for_dump,
+  FILE *fp = stdout;
+
+  if(save_file) {
+    fp = fopen(save_file, "wt");
+  }
+
+  DumpContext context = {
+    .query_age = age_for_dump,
+    .fp = fp
   };
-  walk_GCObject(root, dump_obj, &condition);
+
+  walk_GCObject(root, dump_obj, &context);
+
+  if(fp != stdout) {
+    fclose(fp);
+  }
 }
 
 int lua_inspect_get_all_gc_count(lua_State *L) {
