@@ -263,6 +263,7 @@ LUA_API lua_State *lua_newthread (lua_State *L) {
   L1->tt = LUA_TTHREAD;
   /* link it on list 'allgc' */
   L1->next = g->allgc;
+  L->inspect_age = current_inspect_age;
   g->allgc = obj2gco(L1);
   /* anchor it on L stack */
   setthvalue(L, L->top, L1);

@@ -144,6 +144,8 @@ LUAI_FUNC void luaC_checkfinalizer (lua_State *L, GCObject *o, Table *mt);
 LUAI_FUNC void luaC_upvdeccount (lua_State *L, UpVal *uv);
 
 
-void lua_inspect_dump(lua_State* L, const char *save_file);
+void lua_inspect_dump(lua_State* L, int16_t age_for_dump, const char *save_file);
+
+extern int16_t current_inspect_age;
 
 #endif

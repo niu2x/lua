@@ -211,6 +211,7 @@ GCObject *luaC_newobj (lua_State *L, int tt, size_t sz) {
   o->marked = luaC_white(g);
   o->tt = tt;
   o->next = g->allgc;
+  o->inspect_age = current_inspect_age;
   g->allgc = o;
   return o;
 }
@@ -1177,17 +1178,15 @@ void luaC_fullgc (lua_State *L, int isemergency) {
 /* }====================================================== */
 
 
-typedef void (*walk_GCObject_visitor)(GCObject *o);
-static void walk_GCObject(GCObject *o, walk_GCObject_visitor visitor) {
+typedef void (*walk_GCObject_visitor)(GCObject *o, void *);
+static void walk_GCObject(GCObject *o, walk_GCObject_visitor visitor, void *user_data) {
   while(o){
-    visitor(o);
+    visitor(o, user_data);
     o = o->next;
   }
 }
 
 static const char *get_type_name(lu_byte tt) {
-  
-
   if((tt & 0x0F) == LUA_TFUNCTION) {
     if(tt == (LUA_TLCL)) {
       return "Lua closure";
@@ -1215,13 +1214,28 @@ static const char *get_type_name(lu_byte tt) {
   return "Unknown Type";
 }
 
-static void test(GCObject *o) {
-  printf("obj: %p\n", o);
-  printf("  tt: %s (%02x)\n", get_type_name(o->tt) , o->tt);
+typedef struct {
+  int age;
+}DumpCondition;
+
+static void test(GCObject *o, void *user_data) {
+  DumpCondition *condition = (DumpCondition *)user_data;
+
+  if(condition->age == -1 || condition->age == o->inspect_age) {
+    printf("obj: %p\n", o);
+    printf("  tt: %s (%02x)\n", get_type_name(o->tt) , o->tt);
+    printf("  age: %d\n", o->inspect_age);
+  }
 }
 
-void lua_inspect_dump(lua_State* L, const char *save_file) {
+void lua_inspect_dump(lua_State* L, int16_t age_for_dump, const char *save_file) {
   global_State *g = G(L);
   GCObject* root = g->allgc;
-  walk_GCObject(root, test);
+
+  DumpCondition condition = {
+    .age = age_for_dump,
+  };
+  walk_GCObject(root, test, &condition);
 }
+
+int16_t current_inspect_age = 0;

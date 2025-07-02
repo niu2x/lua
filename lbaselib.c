@@ -200,30 +200,31 @@ static int luaB_collectgarbage (lua_State *L) {
 
 static int luaB_inspect(lua_State *L) {
   enum {
-    INSPECT_CAPTURE,
-    INSPECT_DUMP_CAPTURE,
-    INSPECT_COMPARE_CAPTURE,
     INSPECT_DUMP,
+    INSPECT_SET_AGE,
+    INSPECT_GET_AGE,
   };
 
-  static const char *const opts[] = {"capture", "dump_capture", "compare_capture",  "dump", NULL};
-  static const int optsnum[] = {INSPECT_CAPTURE, INSPECT_DUMP_CAPTURE, INSPECT_COMPARE_CAPTURE, INSPECT_DUMP};
+  static const char *const opts[] = {"dump","set_age", "get_age", NULL};
+  static const int optsnum[] = {INSPECT_DUMP,INSPECT_SET_AGE, INSPECT_GET_AGE };
 
   int o = optsnum[luaL_checkoption(L, 1, "inspect", opts)];
   switch (o) {
-    case INSPECT_CAPTURE: {
-      return 0;
-    }
-    case INSPECT_DUMP_CAPTURE: {
-      return 0;
-    }
-    case INSPECT_COMPARE_CAPTURE: {
-      return 0;
-    }
     case INSPECT_DUMP: {
-      const char *save_file = luaL_optstring(L, 2, NULL);
-      lua_inspect_dump(L, save_file);
+      uint16_t age_for_dump = luaL_optinteger(L, 2, -1);
+      const char *save_file = luaL_optstring(L, 3, NULL);
+      lua_inspect_dump(L, age_for_dump, save_file);
       return 0;
+    }
+
+    case INSPECT_SET_AGE: {
+      current_inspect_age = luaL_checkinteger(L, 2);
+      return 0;
+    }
+
+    case INSPECT_GET_AGE: {
+      lua_pushinteger(L, current_inspect_age);
+      return 1;
     }
     default: {
       return 0;
