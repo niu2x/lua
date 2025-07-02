@@ -15,6 +15,8 @@
 // limitations under the License.
 //
 
+#if defined(__APPLE__)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,7 +36,7 @@ static int readfn(void *handler, char *buf, int size) {
   if (size > available) {
     size = available;
   }
-  memcpy(buf, mem->buffer, sizeof(char) * size);
+  memcpy(buf, mem->buffer + mem->pos, sizeof(char) * size);
   mem->pos += size;
   
   return size;
@@ -47,7 +49,7 @@ static int writefn(void *handler, const char *buf, int size) {
   if (size > available) {
     size = available;
   }
-  memcpy(mem->buffer, buf, sizeof(char) * size);
+  memcpy(mem->buffer + mem->pos, buf, sizeof(char) * size);
   mem->pos += size;
 
   return size;
@@ -90,3 +92,5 @@ FILE *fmemopen(void *buf, size_t size, const char *mode) {
   // funopen's man page: https://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man3/funopen.3.html
   return funopen(mem, readfn, writefn, seekfn, closefn);
 }
+
+#endif
